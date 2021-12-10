@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 pragma abicoder v2;
 
-import "../../../lib/openzeppelin/contracts/token/ERC20/IERC20.sol";
+import "../../../lib/openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 struct StrategyParams {
     uint256 performanceFee; // Strategist's fee (basis points)
@@ -17,21 +17,21 @@ struct StrategyParams {
 }
 
 interface IVault is IERC20 {
-    function token() external view returns (IERC20);
+    function token() external view returns (IERC20Metadata);
 
-    function apiVersion() external pure returns (string memory _apiVersion);
+    function apiVersion() external view returns (string memory _apiVersion);
 
-    function governance() external pure returns (address);
+    function governance() external view returns (address);
 
-    function management() external pure returns (address);
+    function management() external view returns (address);
 
-    function guardian() external pure returns (address);
+    function guardian() external view returns (address);
 
-    function pendingGovernance() external pure returns (address);
+    function pendingGovernance() external view returns (address);
 
     function strategies(address _strategyAddress)
         external
-        pure
+        view
         returns (
             uint256,
             uint256,
@@ -44,39 +44,25 @@ interface IVault is IERC20 {
             uint256
         );
 
-    function withdrawalQueue() external pure returns (address[] memory);
+    function withdrawalQueue() external view returns (address[] memory);
 
-    function emergencyShutdown() external pure returns (bool);
+    function emergencyShutdown() external view returns (bool);
 
-    function depositLimit() external pure returns (uint256);
+    function depositLimit() external view returns (uint256);
 
-    function debtRatio() external pure returns (uint256);
+    function debtRatio() external view returns (uint256);
 
-    function totalDebt() external pure returns (uint256);
+    function totalDebt() external view returns (uint256);
 
-    function lastReport() external pure returns (uint256);
+    function lastReport() external view returns (uint256);
 
-    function activation() external pure returns (uint256);
+    function activation() external view returns (uint256);
 
-    function managementFee() external pure returns (uint256);
+    function managementFee() external view returns (uint256);
 
-    function performanceFee() external pure returns (uint256);
+    function performanceFee() external view returns (uint256);
 
-    function rewards() external pure returns (address);
-
-    function initialize(
-        address token,
-        address governance,
-        address rewards,
-        string memory nameOverride,
-        string memory symbolOverride,
-        address guardian,
-        address management
-    ) external;
-
-    function setName(string memory name) external;
-
-    function setSymbol(string memory symbol) external;
+    function rewards() external view returns (address);
 
     function setGovernance(address governance) external;
 
