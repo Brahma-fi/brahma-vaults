@@ -187,6 +187,42 @@ abstract contract Vault is IVault, ERC20 {
         token.safeTransferFrom(msg.sender, address(this), _amount);
     }
 
+    function _shareValue(uint256 shares) internal view returns (uint256) {
+        if (totalSupply() == 0) {
+            return shares;
+        }
+
+        return shares.mul(_totalAssets().div(totalSupply()));
+    }
+
+    function _sharesForAmount(uint256 amount) internal view returns (uint256) {
+        uint256 freeFunds = _totalAssets();
+
+        if (freeFunds <= 0) {
+            return 0;
+        }
+
+        return amount.mul(totalSupply().div(freeFunds));
+    }
+
+    function maxAvailableShares()
+        external
+        view
+        returns (uint256 _maxAvailableShares)
+    {
+        _maxAvailableShares = _sharesForAmount(token.balanceOf(address(this)));
+
+        for (uint256 i = 0; i < withdrawalQueue.length; i++) {
+            if (withdrawalQueue[i] == address(0x0)) {
+                break;
+            }
+
+            _maxAvailableShares += _sharesForAmount(
+                strategies[withdrawalQueue[i]].totalDebt
+            );
+        }
+    }
+
     function _initialize(
         address _token,
         address _governance,
