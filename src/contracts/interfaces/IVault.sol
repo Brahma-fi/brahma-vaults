@@ -19,40 +19,50 @@ struct StrategyParams {
 interface IVault is IERC20 {
     function token() external view returns (IERC20);
 
-    function apiVersion() external view returns (string memory);
+    function apiVersion() external pure returns (string memory _apiVersion);
 
-    function governance() external view returns (address);
+    function governance() external pure returns (address);
 
-    function management() external view returns (address);
+    function management() external pure returns (address);
 
-    function guardian() external view returns (address);
+    function guardian() external pure returns (address);
 
-    function pendingGovernance() external view returns (address);
+    function pendingGovernance() external pure returns (address);
 
     function strategies(address _strategyAddress)
         external
-        view
-        returns (StrategyParams memory);
+        pure
+        returns (
+            uint256,
+            uint256,
+            uint256,
+            uint256,
+            uint256,
+            uint256,
+            uint256,
+            uint256,
+            uint256
+        );
 
-    function withdrawalQueue() external view returns (address[] memory);
+    function withdrawalQueue() external pure returns (address[] memory);
 
-    function emergencyShutdown() external view returns (bool);
+    function emergencyShutdown() external pure returns (bool);
 
-    function depositLimit() external view returns (uint256);
+    function depositLimit() external pure returns (uint256);
 
-    function debtRatio() external view returns (uint256);
+    function debtRatio() external pure returns (uint256);
 
-    function totalDebt() external view returns (uint256);
+    function totalDebt() external pure returns (uint256);
 
-    function lastReport() external view returns (uint256);
+    function lastReport() external pure returns (uint256);
 
-    function activation() external view returns (uint256);
+    function activation() external pure returns (uint256);
 
-    function managementFee() external view returns (uint256);
+    function managementFee() external pure returns (uint256);
 
-    function performanceFee() external view returns (uint256);
+    function performanceFee() external pure returns (uint256);
 
-    function rewards() external view returns (uint256);
+    function rewards() external pure returns (address);
 
     function initialize(
         address token,
