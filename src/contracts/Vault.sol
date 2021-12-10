@@ -7,6 +7,7 @@ import "./interfaces/IVault.sol";
 import "../../lib/openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../../lib/openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../lib/openzeppelin/contracts/utils/math/SafeMath.sol";
+import "../../lib/openzeppelin/contracts/utils/math/Math.sol";
 
 abstract contract Vault is IVault, ERC20 {
     using SafeMath for uint256;
@@ -14,6 +15,7 @@ abstract contract Vault is IVault, ERC20 {
 
     string public constant API_VERSION = "1.0.0";
     uint256 public constant MAX_BPS = 10000;
+    uint256 private constant MAX_UINT256 = type(uint256).max;
 
     IERC20Metadata public token;
     address public governance;
@@ -22,6 +24,7 @@ abstract contract Vault is IVault, ERC20 {
     address public guardian;
 
     mapping(address => StrategyParams) public strategies;
+    uint256 public strategiesCount;
     address[] public withdrawalQueue;
 
     bool public emergencyShutdown;
@@ -112,6 +115,20 @@ abstract contract Vault is IVault, ERC20 {
         }
 
         emergencyShutdown = _active;
+    }
+
+    function setWithdrawalQueue(address[] memory queue) external override {
+        require(
+            queue.length > 0 && queue.length <= strategiesCount,
+            "Invalid withdrawal Queue"
+        );
+
+        for (uint256 i = 0; i < queue.length; i++) {
+            withdrawalQueue[i] = queue[i];
+        }
+        for (uint256 i = queue.length; i < withdrawalQueue.length; i++) {
+            withdrawalQueue[i] = address(0x0);
+        }
     }
 
     function _initialize(
