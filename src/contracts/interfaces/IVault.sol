@@ -4,7 +4,7 @@ pragma abicoder v2;
 
 import "../../../lib/openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-struct Strategy {
+struct StrategyParams {
     uint256 performanceFee; // Strategist's fee (basis points)
     uint256 activation; // Activation block.timestamp
     uint256 debtRatio; // Maximum borrow amount (in BPS of total assets)
@@ -32,7 +32,7 @@ interface IVault is IERC20 {
     function strategies(address _strategyAddress)
         external
         view
-        returns (Strategy memory);
+        returns (StrategyParams memory);
 
     function withdrawalQueue() external view returns (address[] memory);
 
