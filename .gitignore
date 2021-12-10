@@ -1,3 +1,7 @@
+# temps
 /cache
 /out
+
+# deps
 /lib
+/node_modules

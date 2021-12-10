@@ -1,0 +1,15 @@
+{
+  "name": "aastra-v2",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/Brahma-fi/aastra-v2.git",
+  "author": "pradeep-selva <pradeepselvaraju@gmail.com>",
+  "license": "MIT",
+  "private": false,
+  "devDependencies": {
+    "prettier": "^2.5.1",
+    "prettier-plugin-solidity": "^1.0.0-beta.19",
+    "solhint": "^3.3.6",
+    "solhint-plugin-prettier": "^0.0.5"
+  }
+}
