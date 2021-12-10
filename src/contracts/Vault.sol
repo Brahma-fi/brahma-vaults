@@ -52,6 +52,68 @@ abstract contract Vault is IVault, ERC20 {
         return API_VERSION;
     }
 
+    function setGovernance(address _governance) external onlyGovernance {
+        pendingGovernance = _governance;
+    }
+
+    function acceptGovernance() external {
+        require(
+            msg.sender == pendingGovernance,
+            "access :: only pendingGovernance"
+        );
+        governance = msg.sender;
+    }
+
+    function setManangement(address _management) external onlyGovernance {
+        management = _management;
+    }
+
+    function setRewards(address _rewards) external onlyGovernance {
+        require(
+            _rewards != address(0x0) && rewards != address(this),
+            "Invalid rewards address"
+        );
+        rewards = _rewards;
+    }
+
+    function setGuardian(address _guardian) external {
+        require(
+            msg.sender == guardian || msg.sender == governance,
+            "only guardian|governance"
+        );
+        guardian = _guardian;
+    }
+
+    function setDepositLimit(uint256 _depositLimit) external onlyGovernance {
+        depositLimit = _depositLimit;
+    }
+
+    function setPerformanceFee(uint256 _performanceFee)
+        external
+        onlyGovernance
+    {
+        require(_performanceFee <= MAX_BPS / 2, "fee too high");
+        performanceFee = _performanceFee;
+    }
+
+    function setManagementFee(uint256 _managementFee) external onlyGovernance {
+        require(_managementFee <= MAX_BPS, "fee too high");
+        managementFee = _managementFee;
+    }
+
+    function setEmergencyShutdown(bool _active) external {
+        if (_active) {
+            require(
+                msg.sender == guardian || msg.sender == governance,
+                "only guardian|governance"
+            );
+        } else {
+            require(msg.sender == governance, "access: onlyGovernance");
+        }
+
+        emergencyShutdown = _active;
+    }
+
     function _initialize(
         address _token,
         address _governance,
@@ -71,5 +133,20 @@ abstract contract Vault is IVault, ERC20 {
 
         lastReport = block.timestamp;
         activation = block.timestamp;
+    }
+
+    modifier onlyGovernance() {
+        require(msg.sender == governance, "access :: onlyGovernance");
+        _;
+    }
+
+    modifier onlyGuardian() {
+        require(msg.sender == guardian, "access :: onlyGuardian");
+        _;
+    }
+
+    modifier onlyManagement() {
+        require(msg.sender == management, "access :: onlyManagement");
+        _;
     }
 }

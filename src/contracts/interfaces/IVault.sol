@@ -64,21 +64,23 @@ interface IVault is IERC20 {
 
     function rewards() external view returns (address);
 
-    function setGovernance(address governance) external;
+    function setGovernance(address _governance) external;
 
     function acceptGovernance() external;
 
-    function setManangement(address management) external;
+    function setManangement(address _management) external;
 
-    function setGuardian(address guardian) external;
+    function setGuardian(address _guardian) external;
 
-    function setRewards(address rewards) external;
+    function setRewards(address _rewards) external;
 
-    function setDepositLimit(uint256 depositLimit) external;
+    function setDepositLimit(uint256 _depositLimit) external;
 
-    function setPerformanceFee(uint256 depositLimit) external;
+    function setPerformanceFee(uint256 _performanceFee) external;
 
-    function setManagementFee(uint256 depositLimit) external;
+    function setManagementFee(uint256 _managementFee) external;
+
+    function setEmergencyShutdown(bool _active) external;
 
     function setWithdrawalQueue(address[] memory queue) external;
 
