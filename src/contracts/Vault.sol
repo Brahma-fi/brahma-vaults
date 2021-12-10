@@ -131,6 +131,62 @@ abstract contract Vault is IVault, ERC20 {
         }
     }
 
+    function _totalAssets() internal view returns (uint256) {
+        return token.balanceOf(address(this)) + totalDebt;
+    }
+
+    function totalAssets() external view returns (uint256) {
+        return _totalAssets();
+    }
+
+    function _issueSharesForAmount(address to, uint256 amount)
+        internal
+        returns (uint256 shares)
+    {
+        uint256 totalSupply = totalSupply();
+
+        if (totalSupply > 0) {
+            shares = amount.mul(totalSupply.div(_totalAssets()));
+        } else {
+            shares = amount;
+        }
+
+        _mint(to, shares);
+    }
+
+    function _depositHealthCheck() internal view {
+        require(!emergencyShutdown, "deposits are locked");
+        require(
+            msg.sender != address(0x0) && msg.sender != address(this),
+            "bad request"
+        );
+    }
+
+    function deposit(uint256 _amount, address recepient)
+        external
+        returns (uint256 sharesOut)
+    {
+        _depositHealthCheck();
+        require(_amount > 0, "amount cannot be zero");
+        require(_totalAssets() + _amount <= depositLimit, "excess deposit");
+
+        sharesOut = _issueSharesForAmount(recepient, _amount);
+        token.safeTransferFrom(msg.sender, address(this), _amount);
+    }
+
+    function deposit(address recepient) external returns (uint256 sharesOut) {
+        _depositHealthCheck();
+        uint256 _amount = Math.min(
+            depositLimit - _totalAssets(),
+            token.balanceOf(msg.sender)
+        );
+
+        require(_amount > 0, "amount cannot be zero");
+
+        sharesOut = _issueSharesForAmount(recepient, _amount);
+        token.safeTransferFrom(msg.sender, address(this), _amount);
+    }
+
     function _initialize(
         address _token,
         address _governance,
