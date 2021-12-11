@@ -6,10 +6,11 @@ import "./interfaces/IVault.sol";
 
 import "../../lib/openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../../lib/openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../../lib/openzeppelin/contracts/security/ReentrancyGuard.sol";
 import "../../lib/openzeppelin/contracts/utils/math/SafeMath.sol";
 import "../../lib/openzeppelin/contracts/utils/math/Math.sol";
 
-abstract contract Vault is IVault, ERC20 {
+abstract contract Vault is IVault, ERC20, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20Metadata;
 
@@ -55,11 +56,15 @@ abstract contract Vault is IVault, ERC20 {
         return API_VERSION;
     }
 
-    function setGovernance(address _governance) external onlyGovernance {
+    function setGovernance(address _governance)
+        external
+        override
+        onlyGovernance
+    {
         pendingGovernance = _governance;
     }
 
-    function acceptGovernance() external {
+    function acceptGovernance() external override {
         require(
             msg.sender == pendingGovernance,
             "access :: only pendingGovernance"
@@ -67,11 +72,15 @@ abstract contract Vault is IVault, ERC20 {
         governance = msg.sender;
     }
 
-    function setManangement(address _management) external onlyGovernance {
+    function setManangement(address _management)
+        external
+        override
+        onlyGovernance
+    {
         management = _management;
     }
 
-    function setRewards(address _rewards) external onlyGovernance {
+    function setRewards(address _rewards) external override onlyGovernance {
         require(
             _rewards != address(0x0) && rewards != address(this),
             "Invalid rewards address"
@@ -79,7 +88,7 @@ abstract contract Vault is IVault, ERC20 {
         rewards = _rewards;
     }
 
-    function setGuardian(address _guardian) external {
+    function setGuardian(address _guardian) external override {
         require(
             msg.sender == guardian || msg.sender == governance,
             "only guardian|governance"
@@ -87,24 +96,33 @@ abstract contract Vault is IVault, ERC20 {
         guardian = _guardian;
     }
 
-    function setDepositLimit(uint256 _depositLimit) external onlyGovernance {
+    function setDepositLimit(uint256 _depositLimit)
+        external
+        override
+        onlyGovernance
+    {
         depositLimit = _depositLimit;
     }
 
     function setPerformanceFee(uint256 _performanceFee)
         external
+        override
         onlyGovernance
     {
         require(_performanceFee <= MAX_BPS / 2, "fee too high");
         performanceFee = _performanceFee;
     }
 
-    function setManagementFee(uint256 _managementFee) external onlyGovernance {
+    function setManagementFee(uint256 _managementFee)
+        external
+        override
+        onlyGovernance
+    {
         require(_managementFee <= MAX_BPS, "fee too high");
         managementFee = _managementFee;
     }
 
-    function setEmergencyShutdown(bool _active) external {
+    function setEmergencyShutdown(bool _active) external override {
         if (_active) {
             require(
                 msg.sender == guardian || msg.sender == governance,
@@ -135,7 +153,7 @@ abstract contract Vault is IVault, ERC20 {
         return token.balanceOf(address(this)) + totalDebt;
     }
 
-    function totalAssets() external view returns (uint256) {
+    function totalAssets() external view override returns (uint256) {
         return _totalAssets();
     }
 
@@ -164,6 +182,8 @@ abstract contract Vault is IVault, ERC20 {
 
     function deposit(uint256 _amount, address recepient)
         external
+        override
+        nonReentrant
         returns (uint256 sharesOut)
     {
         _depositHealthCheck();
@@ -174,7 +194,12 @@ abstract contract Vault is IVault, ERC20 {
         token.safeTransferFrom(msg.sender, address(this), _amount);
     }
 
-    function deposit(address recepient) external returns (uint256 sharesOut) {
+    function deposit(address recepient)
+        external
+        override
+        nonReentrant
+        returns (uint256 sharesOut)
+    {
         _depositHealthCheck();
         uint256 _amount = Math.min(
             depositLimit - _totalAssets(),
@@ -208,6 +233,7 @@ abstract contract Vault is IVault, ERC20 {
     function maxAvailableShares()
         external
         view
+        override
         returns (uint256 _maxAvailableShares)
     {
         _maxAvailableShares = _sharesForAmount(token.balanceOf(address(this)));
@@ -222,6 +248,12 @@ abstract contract Vault is IVault, ERC20 {
             );
         }
     }
+
+    function withdraw(
+        uint256 maxShares,
+        address recepient,
+        uint256 maxLoss
+    ) external override nonReentrant returns (uint256 amountOut) {}
 
     function _initialize(
         address _token,

@@ -92,6 +92,8 @@ interface IVault is IERC20 {
         external
         returns (uint256 sharesOut);
 
+    function deposit(address recepient) external returns (uint256 sharesOut);
+
     function maxAvailableShares()
         external
         view
