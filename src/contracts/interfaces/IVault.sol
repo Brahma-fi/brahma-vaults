@@ -99,6 +99,8 @@ interface IVault is IERC20 {
         view
         returns (uint256 _maxAvailableShares);
 
+    function withdraw(address recepient, uint256 maxLoss) external;
+
     function withdraw(
         uint256 maxShares,
         address recepient,
