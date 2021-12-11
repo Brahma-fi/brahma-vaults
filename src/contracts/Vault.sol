@@ -3,6 +3,7 @@ pragma solidity ^0.8.0;
 pragma abicoder v2;
 
 import "./interfaces/IVault.sol";
+import "./interfaces/IStrategy.sol";
 
 import "../../lib/openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "../../lib/openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
@@ -253,7 +254,72 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         uint256 maxShares,
         address recepient,
         uint256 maxLoss
-    ) external override nonReentrant returns (uint256 amountOut) {}
+    ) external override nonReentrant returns (uint256) {
+        uint256 shares = maxShares;
+
+        require(maxLoss <= MAX_BPS, "loss too large");
+        require(
+            shares <= IERC20(address(this)).balanceOf(msg.sender),
+            "insufficient balance"
+        );
+        require(shares > 0, "cannot withdraw 0 shares");
+
+        uint256 value = _shareValue(shares);
+
+        if (value > token.balanceOf(address(this))) {
+            uint256 totalLoss = 0;
+
+            for (uint256 i = 0; i < withdrawalQueue.length; i++) {
+                address strategy = withdrawalQueue[i];
+
+                if (strategy == address(0x0)) {
+                    break;
+                }
+
+                uint256 vaultBalance = token.balanceOf(address(this));
+                if (value < vaultBalance) {
+                    break;
+                }
+
+                uint256 amountNeeded = value.sub(vaultBalance);
+                amountNeeded = Math.min(
+                    amountNeeded,
+                    strategies[strategy].totalDebt
+                );
+                if (amountNeeded == 0) {
+                    continue;
+                }
+
+                uint256 loss = IStrategy(strategy).withdraw(amountNeeded);
+                uint256 withdrawn = token.balanceOf(address(this)).sub(
+                    vaultBalance
+                );
+                if (loss > 0) {
+                    value -= loss;
+                    totalLoss += loss;
+                }
+
+                strategies[strategy].totalDebt -= withdrawn;
+                totalDebt -= withdrawn;
+            }
+
+            uint256 vaultBalance = token.balanceOf(address(this));
+            if (value > vaultBalance) {
+                value = vaultBalance;
+                shares = _sharesForAmount(value.add(totalLoss));
+            }
+
+            require(
+                totalLoss <= maxLoss.mul(value.add(totalLoss).div(MAX_BPS)),
+                "loss protection"
+            );
+        }
+
+        _burn(msg.sender, shares);
+        token.safeTransfer(recepient, value);
+
+        return value;
+    }
 
     function _initialize(
         address _token,

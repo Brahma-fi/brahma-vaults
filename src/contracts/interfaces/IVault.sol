@@ -103,7 +103,7 @@ interface IVault is IERC20 {
         uint256 maxShares,
         address recepient,
         uint256 maxLoss
-    ) external returns (uint256 amountOut);
+    ) external returns (uint256);
 
     function pricePerShare() external returns (uint256);
 
