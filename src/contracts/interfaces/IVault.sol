@@ -153,11 +153,11 @@ interface IVault is IERC20 {
 
     function expectedReturn(address strategy) external view returns (uint256);
 
-    function report(
-        uint256 gain,
-        uint256 loss,
-        uint256 _debtPayment
-    ) external returns (uint256 debtOutstanding);
+    function report(uint256 gain, uint256 _debtPayment)
+        external
+        returns (uint256 debt);
 
     function sweep(address token, uint256 amount) external;
+
+    function sweep(address token) external;
 }

@@ -701,6 +701,77 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         return totalFee;
     }
 
+    function report(uint256 gain, uint256 _debtPayment)
+        external
+        override
+        returns (uint256 debt)
+    {
+        require(strategies[msg.sender].activation > 0, "strategy not active");
+        require(
+            token.balanceOf(msg.sender) >= gain + _debtPayment,
+            "insufficient funds"
+        );
+
+        _assessFees(msg.sender, gain);
+        uint256 credit = _creditAvailable(msg.sender);
+
+        strategies[msg.sender].totalGain += gain;
+
+        debt = _debtOutstanding(msg.sender);
+        uint256 debtPayment = Math.min(_debtPayment, debt);
+
+        if (debtPayment > 0) {
+            strategies[msg.sender].totalDebt -= debtPayment;
+            totalDebt -= debtPayment;
+            debt -= debtPayment;
+        }
+
+        if (credit > 0) {
+            strategies[msg.sender].totalDebt += credit;
+            totalDebt += credit;
+        }
+
+        uint256 totalAvail = gain.add(debtPayment);
+        if (totalAvail < credit) {
+            IERC20Metadata(address(this)).safeTransfer(
+                msg.sender,
+                credit.sub(totalAvail)
+            );
+        } else if (totalAvail > credit) {
+            IERC20Metadata(address(this)).safeTransferFrom(
+                msg.sender,
+                address(this),
+                totalAvail.sub(credit)
+            );
+        }
+
+        strategies[msg.sender].lastReport = block.timestamp;
+        lastReport = block.timestamp;
+
+        if (strategies[msg.sender].debtRatio == 0 || emergencyShutdown) {
+            return IStrategy(msg.sender).estimatedTotalAssets();
+        } else {
+            return debt;
+        }
+    }
+
+    function sweep(address _token, uint256 amount)
+        external
+        override
+        onlyGovernance
+    {
+        require(_token != address(token), "cannot be want token");
+        IERC20Metadata(_token).safeTransfer(governance, amount);
+    }
+
+    function sweep(address _token) external override onlyGovernance {
+        require(_token != address(token), "cannot be want token");
+        IERC20Metadata(_token).safeTransfer(
+            governance,
+            IERC20Metadata(_token).balanceOf(address(this))
+        );
+    }
+
     function _initialize(
         address _token,
         address _governance,
