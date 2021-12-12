@@ -28,4 +28,6 @@ interface IStrategy {
     function harvest() external;
 
     function withdraw(uint256 _amountNeeded) external returns (uint256 _loss);
+
+    function migrate(address newVersion) external;
 }

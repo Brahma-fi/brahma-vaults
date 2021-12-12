@@ -441,6 +441,171 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         strategies[strategy].performanceFee = _performanceFee;
     }
 
+    function _revokeStrategy(address strategy) internal {
+        debtRatio -= strategies[strategy].debtRatio;
+        strategies[strategy].debtRatio = 0;
+    }
+
+    function revokeStrategy(address strategy) external override {
+        require(
+            msg.sender == guardian || msg.sender == governance,
+            "access restricted"
+        );
+
+        if (strategies[strategy].debtRatio == 0) return;
+        _revokeStrategy(strategy);
+    }
+
+    function migrateStrategy(address oldVersion, address newVersion)
+        external
+        override
+        onlyGovernance
+    {
+        require(newVersion != address(0x0), "invalid new version address");
+        require(
+            strategies[oldVersion].activation > 0,
+            "old version not activated"
+        );
+        require(
+            strategies[newVersion].activation == 0,
+            "new version already activated"
+        );
+
+        StrategyParams memory strategy = strategies[oldVersion];
+        _revokeStrategy(oldVersion);
+
+        debtRatio += strategy.debtRatio;
+        strategies[oldVersion].totalDebt = 0;
+
+        strategies[newVersion] = StrategyParams({
+            performanceFee: strategy.performanceFee,
+            activation: strategy.lastReport,
+            debtRatio: strategy.debtRatio,
+            minDebtPerHarvest: strategy.minDebtPerHarvest,
+            maxDebtPerHarvest: strategy.maxDebtPerHarvest,
+            lastReport: strategy.lastReport,
+            totalDebt: strategy.totalDebt,
+            totalGain: 0,
+            totalLoss: 0
+        });
+
+        IStrategy(oldVersion).migrate(newVersion);
+        for (uint256 i = 0; i < withdrawalQueue.length; i++) {
+            if (withdrawalQueue[i] == oldVersion) {
+                withdrawalQueue[i] = newVersion;
+            }
+        }
+    }
+
+    function addStrategyToQueue(address strategy)
+        external
+        override
+        validStrategyUpdation(strategy)
+    {
+        for (uint256 i = 0; i < withdrawalQueue.length; i++) {
+            require(withdrawalQueue[i] != strategy, "strategy already queued");
+        }
+
+        withdrawalQueue.push(strategy);
+        _organizeWithdrawalQueue();
+    }
+
+    function removeStrategyFromQueue(address strategy) external override {
+        require(
+            msg.sender == guardian || msg.sender == governance,
+            "access restricted"
+        );
+
+        for (uint256 i = 0; i < withdrawalQueue.length; i++) {
+            if (withdrawalQueue[i] == strategy) {
+                withdrawalQueue[i] = address(0x0);
+                _organizeWithdrawalQueue();
+                return;
+            }
+        }
+
+        require(false, "strategy not found");
+    }
+
+    function _debtOutstanding(address strategy)
+        internal
+        view
+        returns (uint256)
+    {
+        if (debtRatio == 0) {
+            return strategies[strategy].totalDebt;
+        }
+
+        uint256 strategyDebtLimit = strategies[strategy].debtRatio.mul(
+            _totalAssets().div(MAX_BPS)
+        );
+        uint256 strategyTotalDebt = strategies[strategy].totalDebt;
+
+        if (emergencyShutdown) {
+            return strategyTotalDebt;
+        } else if (strategyTotalDebt == strategyDebtLimit) {
+            return 0;
+        } else {
+            return strategyTotalDebt.sub(strategyDebtLimit);
+        }
+    }
+
+    function debtOutstanding(address strategy)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        return _debtOutstanding(strategy);
+    }
+
+    function _creditAvailable(address strategy)
+        internal
+        view
+        returns (uint256)
+    {
+        if (emergencyShutdown) {
+            return 0;
+        }
+
+        uint256 vaultTotalAssets = _totalAssets();
+        uint256 vaultDebtLimit = debtRatio.mul(vaultTotalAssets.div(MAX_BPS));
+        uint256 strategyDebtLimit = strategies[strategy].debtRatio.mul(
+            vaultTotalAssets.div(MAX_BPS)
+        );
+        uint256 strategyTotalDebt = strategies[strategy].totalDebt;
+        uint256 strategyMinDebtPerHarvest = strategies[strategy]
+            .minDebtPerHarvest;
+        uint256 strategyMaxDebtPerHarvest = strategies[strategy]
+            .maxDebtPerHarvest;
+
+        if (
+            strategyDebtLimit <= strategyTotalDebt ||
+            vaultDebtLimit <= totalDebt
+        ) {
+            return 0;
+        }
+
+        uint256 available = strategyDebtLimit = strategyTotalDebt;
+        available = Math.min(available, vaultDebtLimit - totalDebt);
+        available = Math.min(available, token.balanceOf(address(this)));
+
+        if (available < strategyMinDebtPerHarvest) {
+            return 0;
+        } else {
+            return Math.min(available, strategyMaxDebtPerHarvest);
+        }
+    }
+
+    function creditAvailable(address strategy)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        return _creditAvailable(strategy);
+    }
+
     function _initialize(
         address _token,
         address _governance,
