@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 pragma abicoder v2;
 
-interface StrategyAPI {
+interface IStrategy {
     function name() external view returns (string memory);
 
     function vault() external view returns (address);
@@ -27,5 +27,5 @@ interface StrategyAPI {
 
     function harvest() external;
 
-    function withdraw(uint256 _amountNeeded) external returns (uint256 _loss) 
+    function withdraw(uint256 _amountNeeded) external returns (uint256 _loss);
 }

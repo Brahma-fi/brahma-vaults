@@ -99,7 +99,9 @@ interface IVault is IERC20 {
         view
         returns (uint256 _maxAvailableShares);
 
-    function withdraw(address recepient, uint256 maxLoss) external;
+    function withdraw(address recepient, uint256 maxLoss)
+        external
+        returns (uint256);
 
     function withdraw(
         uint256 maxShares,
@@ -107,34 +109,32 @@ interface IVault is IERC20 {
         uint256 maxLoss
     ) external returns (uint256);
 
-    function pricePerShare() external returns (uint256);
+    function pricePerShare() external view returns (uint256);
 
     function addStrategy(
         address strategy,
-        uint256 debtRatio,
-        uint256 minDebtPerHarvent,
-        uint256 maxDebtPerHarvest,
-        uint256 performanceFee,
-        uint256 profitLimitRatio,
-        uint256 lossLimitRatio
+        uint256 _debtRatio,
+        uint256 _minDebtPerHarvent,
+        uint256 _maxDebtPerHarvest,
+        uint256 _performanceFee
     ) external;
 
-    function updateStrategyDebtRatio(address strategy, uint256 debtRatio)
+    function updateStrategyDebtRatio(address strategy, uint256 _debtRatio)
         external;
 
     function updateStrategyMinDebtPerHarvest(
         address strategy,
-        uint256 minDebtPerHarvest
+        uint256 _minDebtPerHarvest
     ) external;
 
     function updateStrategyMaxDebtPerHarvest(
         address strategy,
-        uint256 maxDebtPerHarvest
+        uint256 _maxDebtPerHarvest
     ) external;
 
     function updateStrategyPerformanceFee(
         address strategy,
-        uint256 performanceFee
+        uint256 _performanceFee
     ) external;
 
     function migrateStrategy(address oldVersion, address newVersion) external;

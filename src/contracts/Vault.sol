@@ -274,12 +274,12 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
                     break;
                 }
 
-                uint256 vaultBalance = token.balanceOf(address(this));
-                if (value < vaultBalance) {
+                uint256 curVaultBalance = token.balanceOf(address(this));
+                if (value < curVaultBalance) {
                     break;
                 }
 
-                uint256 amountNeeded = value.sub(vaultBalance);
+                uint256 amountNeeded = value.sub(curVaultBalance);
                 amountNeeded = Math.min(
                     amountNeeded,
                     strategies[strategy].totalDebt
@@ -290,7 +290,7 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
 
                 uint256 loss = IStrategy(strategy).withdraw(amountNeeded);
                 uint256 withdrawn = token.balanceOf(address(this)).sub(
-                    vaultBalance
+                    curVaultBalance
                 );
                 if (loss > 0) {
                     value -= loss;
@@ -315,12 +315,13 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
 
         _burn(msg.sender, shares);
         token.safeTransfer(recepient, value);
+
+        return value;
     }
 
     function withdraw(address recepient, uint256 maxLoss)
         external
         override
-        nonReentrant
         returns (uint256)
     {
         return _withdraw(token.balanceOf(msg.sender), recepient, maxLoss);
@@ -330,8 +331,114 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         uint256 maxShares,
         address recepient,
         uint256 maxLoss
-    ) external override nonReentrant returns (uint256) {
+    ) external override returns (uint256) {
         return _withdraw(maxShares, recepient, maxLoss);
+    }
+
+    function pricePerShare() external view override returns (uint256) {
+        return _shareValue(10**decimals());
+    }
+
+    function _organizeWithdrawalQueue() internal {
+        uint256 offset = 0;
+
+        for (uint256 i = 0; i < withdrawalQueue.length; i++) {
+            address strategy = withdrawalQueue[i];
+            if (strategy == address(0x0)) {
+                offset += 1;
+            } else if (offset > 0) {
+                withdrawalQueue[i - offset] = strategy;
+                withdrawalQueue[i] = address(0x0);
+            }
+        }
+    }
+
+    function addStrategy(
+        address strategy,
+        uint256 _debtRatio,
+        uint256 _minDebtPerHarvest,
+        uint256 _maxDebtPerHarvest,
+        uint256 _performanceFee
+    ) external override onlyGovernance {
+        require(!emergencyShutdown, "vault is shutdown");
+        require(strategy != address(0x0), "invalid strategy address");
+        require(
+            strategies[strategy].activation == 0,
+            "strategy already activated"
+        );
+        require(
+            IStrategy(strategy).vault() == address(this),
+            "strategy-vault mismatch"
+        );
+        require(
+            IStrategy(strategy).want() == address(token),
+            "strategy-want mismatch"
+        );
+        require(debtRatio + _debtRatio <= MAX_BPS, "debtRatio exceeded");
+        require(
+            _minDebtPerHarvest <= _maxDebtPerHarvest,
+            "invalid debt per harvest config"
+        );
+        require(performanceFee <= MAX_BPS / 2, "performance fee too high");
+
+        strategies[strategy] = StrategyParams({
+            performanceFee: _performanceFee,
+            activation: block.timestamp,
+            debtRatio: _debtRatio,
+            minDebtPerHarvest: _minDebtPerHarvest,
+            maxDebtPerHarvest: _maxDebtPerHarvest,
+            lastReport: block.timestamp,
+            totalDebt: 0,
+            totalGain: 0,
+            totalLoss: 0
+        });
+
+        debtRatio += _debtRatio;
+
+        withdrawalQueue.push(strategy);
+        _organizeWithdrawalQueue();
+    }
+
+    function updateStrategyDebtRatio(address strategy, uint256 _debtRatio)
+        external
+        override
+        validStrategyUpdation(strategy)
+    {
+        require(debtRatio + _debtRatio <= MAX_BPS, "debtRatio exceeded");
+
+        debtRatio -= strategies[strategy].debtRatio;
+        strategies[strategy].debtRatio = _debtRatio;
+        debtRatio += _debtRatio;
+    }
+
+    function updateStrategyMinDebtPerHarvest(
+        address strategy,
+        uint256 _minDebtPerHarvest
+    ) external override validStrategyUpdation(strategy) {
+        require(
+            strategies[strategy].maxDebtPerHarvest >= _minDebtPerHarvest,
+            "minDebtPerHarvest too high"
+        );
+        strategies[strategy].minDebtPerHarvest = _minDebtPerHarvest;
+    }
+
+    function updateStrategyMaxDebtPerHarvest(
+        address strategy,
+        uint256 _maxDebtPerHarvest
+    ) external override validStrategyUpdation(strategy) {
+        require(
+            strategies[strategy].minDebtPerHarvest <= _maxDebtPerHarvest,
+            "maxDebtPerHarvest too low"
+        );
+        strategies[strategy].maxDebtPerHarvest = _maxDebtPerHarvest;
+    }
+
+    function updateStrategyPerformanceFee(
+        address strategy,
+        uint256 _performanceFee
+    ) external override validStrategyUpdation(strategy) {
+        require(performanceFee <= MAX_BPS / 2, "performance fee too high");
+        strategies[strategy].performanceFee = _performanceFee;
     }
 
     function _initialize(
@@ -367,6 +474,15 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
 
     modifier onlyManagement() {
         require(msg.sender == management, "access :: onlyManagement");
+        _;
+    }
+
+    modifier validStrategyUpdation(address strategy) {
+        require(
+            msg.sender == governance || msg.sender == management,
+            "access restricted"
+        );
+        require(strategies[strategy].activation > 0, "strategy not activated");
         _;
     }
 }
