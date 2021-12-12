@@ -18,6 +18,7 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
     string public constant API_VERSION = "1.0.0";
     uint256 public constant MAX_BPS = 10000;
     uint256 private constant MAX_UINT256 = type(uint256).max;
+    uint256 private constant SECS_PER_YEAR = 31556952;
 
     IERC20Metadata public token;
     address public governance;
@@ -587,7 +588,7 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         }
 
         uint256 available = strategyDebtLimit = strategyTotalDebt;
-        available = Math.min(available, vaultDebtLimit - totalDebt);
+        available = Math.min(available, vaultDebtLimit.sub(totalDebt));
         available = Math.min(available, token.balanceOf(address(this)));
 
         if (available < strategyMinDebtPerHarvest) {
@@ -604,6 +605,100 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         returns (uint256)
     {
         return _creditAvailable(strategy);
+    }
+
+    function availableDepositLimit() external view override returns (uint256) {
+        if (depositLimit > _totalAssets()) {
+            return depositLimit.sub(_totalAssets());
+        } else {
+            return 0;
+        }
+    }
+
+    function _expectedReturn(address strategy) internal view returns (uint256) {
+        uint256 strategyLastReport = strategies[strategy].lastReport;
+        uint256 timeSinceLastHarvest = block.timestamp.sub(strategyLastReport);
+        uint256 totalHarvestTime = strategyLastReport.sub(
+            strategies[strategy].activation
+        );
+
+        if (
+            timeSinceLastHarvest > 0 &&
+            totalHarvestTime > 0 &&
+            IStrategy(strategy).isActive()
+        ) {
+            return
+                strategies[strategy].totalGain.mul(
+                    timeSinceLastHarvest.div(totalHarvestTime)
+                );
+        } else {
+            return 0;
+        }
+    }
+
+    function expectedReturn(address strategy)
+        external
+        view
+        override
+        returns (uint256)
+    {
+        return _expectedReturn(strategy);
+    }
+
+    function _assessFees(address strategy, uint256 gain)
+        internal
+        returns (uint256)
+    {
+        if (strategies[strategy].activation == block.timestamp) {
+            return 0;
+        }
+
+        uint256 duration = block.timestamp - strategies[strategy].lastReport;
+        require(duration != 0, "duration cannot be zero");
+
+        if (gain == 0) {
+            return 0;
+        }
+
+        uint256 _managementFee = (
+            strategies[strategy]
+                .totalDebt
+                .sub(IStrategy(strategy).delegatedAssets())
+                .mul(duration)
+                .mul(managementFee)
+        ).div(MAX_BPS).div(SECS_PER_YEAR);
+        uint256 _strategistFee = gain.mul(
+            strategies[strategy].performanceFee.div(MAX_BPS)
+        );
+        uint256 _performanceFee = gain.mul(performanceFee.div(MAX_BPS));
+
+        uint256 totalFee = _managementFee + _strategistFee + _performanceFee;
+
+        if (totalFee > gain) {
+            totalFee = gain;
+        }
+        if (totalFee > 0) {
+            uint256 reward = _issueSharesForAmount(address(this), totalFee);
+
+            if (_strategistFee > 0) {
+                uint256 strategistReward = _strategistFee.mul(
+                    reward.div(totalFee)
+                );
+                IERC20Metadata(address(this)).safeTransfer(
+                    strategy,
+                    strategistReward
+                );
+            }
+
+            if (IERC20Metadata(address(this)).balanceOf(address(this)) > 0) {
+                IERC20Metadata(address(this)).safeTransfer(
+                    rewards,
+                    IERC20Metadata(address(this)).balanceOf(address(this))
+                );
+            }
+        }
+
+        return totalFee;
     }
 
     function _initialize(

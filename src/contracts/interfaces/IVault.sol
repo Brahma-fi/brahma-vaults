@@ -149,9 +149,9 @@ interface IVault is IERC20 {
 
     function creditAvailable(address strategy) external view returns (uint256);
 
-    function availableDepositLimit() external returns (uint256);
+    function availableDepositLimit() external view returns (uint256);
 
-    function expectedReturn(address strategy) external returns (uint256);
+    function expectedReturn(address strategy) external view returns (uint256);
 
     function report(
         uint256 gain,
