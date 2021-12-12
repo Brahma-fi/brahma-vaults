@@ -255,7 +255,7 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         uint256 shares,
         address recepient,
         uint256 maxLoss
-    ) internal nonReentrant returns (uint256) {
+    ) internal returns (uint256) {
         require(maxLoss <= MAX_BPS, "loss too large");
         require(
             shares <= IERC20(address(this)).balanceOf(msg.sender),
@@ -323,6 +323,7 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
     function withdraw(address recepient, uint256 maxLoss)
         external
         override
+        nonReentrant
         returns (uint256)
     {
         return _withdraw(token.balanceOf(msg.sender), recepient, maxLoss);
@@ -332,7 +333,7 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         uint256 maxShares,
         address recepient,
         uint256 maxLoss
-    ) external override returns (uint256) {
+    ) external override nonReentrant returns (uint256) {
         return _withdraw(maxShares, recepient, maxLoss);
     }
 
