@@ -93,7 +93,7 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
     function setGuardian(address _guardian) external override {
         require(
             msg.sender == guardian || msg.sender == governance,
-            "only guardian|governance"
+            "access restricted"
         );
         guardian = _guardian;
     }
@@ -128,7 +128,7 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         if (_active) {
             require(
                 msg.sender == guardian || msg.sender == governance,
-                "only guardian|governance"
+                "access restricted"
             );
         } else {
             require(msg.sender == governance, "access: onlyGovernance");
