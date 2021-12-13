@@ -138,13 +138,13 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
     }
 
     function setWithdrawalQueue(address[] memory queue) external override {
-        // TODO: add a check to see that all elements in queue already exist  in the withdrawalQueue
         require(
             queue.length > 0 && queue.length <= strategiesCount,
             "Invalid withdrawal Queue"
         );
 
         for (uint256 i = 0; i < queue.length; i++) {
+            require(strategies[queue[i]].activation > 0, "strategy not active");
             withdrawalQueue[i] = queue[i];
         }
         for (uint256 i = queue.length; i < withdrawalQueue.length; i++) {
@@ -182,7 +182,7 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
             "bad request"
         );
     }
-    // TODO: add a check to see that the amount is not greater than the deposit limit 
+
     function deposit(uint256 _amount, address recepient)
         external
         override
@@ -268,10 +268,10 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
 
         if (value > token.balanceOf(address(this))) {
             uint256 totalLoss = 0;
+            address strategy;
 
-            // TODO: define strategy as memory with null address outside queue to save gas.
             for (uint256 i = 0; i < withdrawalQueue.length; i++) {
-                address strategy = withdrawalQueue[i];
+                strategy = withdrawalQueue[i];
 
                 if (strategy == address(0x0)) {
                     break;
@@ -402,17 +402,16 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         withdrawalQueue.push(strategy);
         _organizeWithdrawalQueue();
     }
-    
+
     function updateStrategyDebtRatio(address strategy, uint256 _debtRatio)
         external
         override
         validStrategyUpdation(strategy)
     {
         require(debtRatio + _debtRatio <= MAX_BPS, "debtRatio exceeded");
-        // TODO: subtraction is not underflow safe. 
-        debtRatio -= strategies[strategy].debtRatio;
+        debtRatio = debtRatio.sub(strategies[strategy].debtRatio);
         strategies[strategy].debtRatio = _debtRatio;
-        debtRatio += _debtRatio;
+        debtRatio = debtRatio.add(_debtRatio);
     }
 
     function updateStrategyMinDebtPerHarvest(
@@ -442,7 +441,7 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         uint256 _performanceFee
     ) external override validStrategyUpdation(strategy) {
         require(performanceFee <= MAX_BPS / 2, "performance fee too high");
-        require(perfomanceFee != 0, "performance fee too low");
+        require(performanceFee != 0, "performance fee too low");
         strategies[strategy].performanceFee = _performanceFee;
     }
 
@@ -502,12 +501,12 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         }
     }
 
-    // TODO: add check for zero_address
     function addStrategyToQueue(address strategy)
         external
         override
         validStrategyUpdation(strategy)
     {
+        require(strategy != address(0x0), "strategy cannot be zero address");
         for (uint256 i = 0; i < withdrawalQueue.length; i++) {
             require(withdrawalQueue[i] != strategy, "strategy already queued");
         }
@@ -706,18 +705,30 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         return totalFee;
     }
 
+    function _reportLoss(address strategy, uint256 loss) internal {
+        require(strategies[strategy].totalDebt >= loss, "lose exceeded debt");
 
-    // TODO: add loss as input param as it needs to be updated in StrategyParams.
-    function report(uint256 gain, uint256 _debtPayment)
-        external
-        override
-        returns (uint256 debt)
-    {
+        strategies[strategy].totalLoss += loss;
+        strategies[strategy].totalDebt += strategies[strategy].totalDebt.sub(
+            loss
+        );
+        totalDebt = totalDebt.sub(loss);
+    }
+
+    function report(
+        uint256 gain,
+        uint256 loss,
+        uint256 _debtPayment
+    ) external override returns (uint256 debt) {
         require(strategies[msg.sender].activation > 0, "strategy not active");
         require(
             token.balanceOf(msg.sender) >= gain + _debtPayment,
             "insufficient funds"
         );
+
+        if (loss > 0) {
+            _reportLoss(msg.sender, loss);
+        }
 
         _assessFees(msg.sender, gain);
         uint256 credit = _creditAvailable(msg.sender);
