@@ -751,12 +751,9 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
 
         uint256 totalAvail = gain.add(debtPayment);
         if (totalAvail < credit) {
-            IERC20Metadata(address(this)).safeTransfer(
-                msg.sender,
-                credit.sub(totalAvail)
-            );
+            token.safeTransfer(msg.sender, credit.sub(totalAvail));
         } else if (totalAvail > credit) {
-            IERC20Metadata(address(this)).safeTransferFrom(
+            token.safeTransferFrom(
                 msg.sender,
                 address(this),
                 totalAvail.sub(credit)
