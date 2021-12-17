@@ -11,7 +11,7 @@ import "../../lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol"
 import "../../lib/openzeppelin-contracts/contracts/utils/math/SafeMath.sol";
 import "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 
-abstract contract Vault is IVault, ERC20, ReentrancyGuard {
+contract Vault is IVault, ERC20, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20Metadata;
 
@@ -20,27 +20,27 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
     uint256 private constant MAX_UINT256 = type(uint256).max;
     uint256 private constant SECS_PER_YEAR = 31556952;
 
-    IERC20Metadata public token;
-    address public governance;
-    address public pendingGovernance;
-    address public management;
-    address public guardian;
+    IERC20Metadata public override token;
+    address public override governance;
+    address public override pendingGovernance;
+    address public override management;
+    address public override guardian;
 
-    mapping(address => StrategyParams) public strategies;
-    uint256 public strategiesCount;
+    mapping(address => StrategyParams) public override strategies;
+    uint256 public override strategiesCount;
     address[] public withdrawalQueue;
 
-    bool public emergencyShutdown;
+    bool public override emergencyShutdown;
 
-    uint256 public depositLimit;
-    uint256 public debtRatio;
-    uint256 public totalDebt;
-    uint256 public lastReport;
-    uint256 public activation;
+    uint256 public override depositLimit;
+    uint256 public override debtRatio;
+    uint256 public override totalDebt;
+    uint256 public override lastReport;
+    uint256 public override activation;
 
-    address public rewards;
-    uint256 public managementFee;
-    uint256 public performanceFee;
+    address public override rewards;
+    uint256 public override managementFee;
+    uint256 public override performanceFee;
 
     constructor(
         address _token,
@@ -648,21 +648,11 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         return _expectedReturn(strategy);
     }
 
-    function _assessFees(address strategy, uint256 gain)
-        internal
-        returns (uint256)
-    {
-        if (strategies[strategy].activation == block.timestamp) {
-            return 0;
-        }
-
-        uint256 duration = block.timestamp - strategies[strategy].lastReport;
-        require(duration != 0, "duration cannot be zero");
-
-        if (gain == 0) {
-            return 0;
-        }
-
+    function _calcTotalFeeAndDisburseShares(
+        uint256 duration,
+        uint256 gain,
+        address strategy
+    ) internal returns (uint256 totalFee) {
         uint256 _managementFee = (
             strategies[strategy]
                 .totalDebt
@@ -675,7 +665,7 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         );
         uint256 _performanceFee = gain.mul(performanceFee.div(MAX_BPS));
 
-        uint256 totalFee = _managementFee + _strategistFee + _performanceFee;
+        totalFee = _managementFee + _strategistFee + _performanceFee;
 
         if (totalFee > gain) {
             totalFee = gain;
@@ -700,6 +690,30 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
                 );
             }
         }
+    }
+
+    function _assessFees(address strategy, uint256 gain)
+        internal
+        returns (uint256)
+    {
+        if (strategies[strategy].activation == block.timestamp) {
+            return 0;
+        }
+
+        uint256 duration = block.timestamp - strategies[strategy].lastReport;
+        require(duration != 0, "duration cannot be zero");
+
+        if (gain == 0) {
+            return 0;
+        }
+
+        
+
+        uint256 totalFee = _calcTotalFeeAndDisburseShares(
+            duration,
+            gain, 
+            strategy
+        );
 
         return totalFee;
     }
