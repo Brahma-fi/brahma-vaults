@@ -73,7 +73,6 @@ abstract contract Vault is IVault, ERC20, ReentrancyGuard {
         );
         governance = msg.sender;
     }
-
     function setManangement(address _management)
         external
         override
