@@ -5,11 +5,11 @@ pragma abicoder v2;
 import "./interfaces/IVault.sol";
 import "./interfaces/IStrategy.sol";
 
-import "../../lib/openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "../../lib/openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "../../lib/openzeppelin/contracts/security/ReentrancyGuard.sol";
-import "../../lib/openzeppelin/contracts/utils/math/SafeMath.sol";
-import "../../lib/openzeppelin/contracts/utils/math/Math.sol";
+import "../../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
+import "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import "../../lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import "../../lib/openzeppelin-contracts/contracts/utils/math/SafeMath.sol";
+import "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 
 abstract contract Vault is IVault, ERC20, ReentrancyGuard {
     using SafeMath for uint256;

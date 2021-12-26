@@ -2,7 +2,7 @@
 pragma solidity ^0.8.0;
 pragma abicoder v2;
 
-import "../../../lib/openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "../../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
 struct StrategyParams {
     uint256 performanceFee; // Strategist's fee (basis points)
