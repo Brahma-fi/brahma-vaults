@@ -46,7 +46,10 @@ interface IVault is IERC20 {
 
     function strategiesCount() external view returns (uint256);
 
-    function withdrawalQueue() external view returns (address[] memory);
+    function withdrawalQueue(uint256 idx)
+        external
+        view
+        returns (address[] memory);
 
     function emergencyShutdown() external view returns (bool);
 
