@@ -4,8 +4,8 @@ pragma abicoder v2;
 
 import "./interfaces/IVault.sol";
 import "./interfaces/IStrategy.sol";
+import "./utils/ERC20.sol";
 
-import "../../lib/openzeppelin-contracts/contracts/token/ERC20/ERC20.sol";
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import "../../lib/openzeppelin-contracts/contracts/utils/math/SafeMath.sol";
@@ -49,8 +49,9 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         address _guardian,
         address _management,
         string memory _name,
-        string memory _symbol
-    ) ERC20(_name, _symbol) {
+        string memory _symbol,
+        uint8 _decimal
+    ) ERC20(_name, _symbol, _decimal) {
         _initialize(_token, _governance, _rewards, _guardian, _management);
     }
 
@@ -152,8 +153,6 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         internal
         returns (uint256 shares)
     {
-        uint256 totalSupply = totalSupply();
-
         if (totalSupply > 0) {
             shares = amount.mul(totalSupply.div(_totalAssets()));
         } else {
@@ -204,11 +203,11 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
     }
 
     function _shareValue(uint256 shares) internal view returns (uint256) {
-        if (totalSupply() == 0) {
+        if (totalSupply == 0) {
             return shares;
         }
 
-        return shares.mul(_totalAssets().div(totalSupply()));
+        return shares.mul(_totalAssets().div(totalSupply));
     }
 
     function _sharesForAmount(uint256 amount) internal view returns (uint256) {
@@ -218,7 +217,7 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
             return 0;
         }
 
-        return amount.mul(totalSupply().div(freeFunds));
+        return amount.mul(totalSupply.div(freeFunds));
     }
 
     function maxAvailableShares()
@@ -328,7 +327,7 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
     }
 
     function pricePerShare() external view override returns (uint256) {
-        return _shareValue(10**decimals());
+        return _shareValue(10**decimals);
     }
 
     function _organizeWithdrawalQueue() internal {

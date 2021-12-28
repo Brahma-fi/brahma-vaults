@@ -6,7 +6,8 @@
     "no-empty-blocks": ["false"],
     "no-inline-assembly": ["false"],
     "max-states-count": ["false"],
-    "not-rely-on-time": ["false"]
+    "not-rely-on-time": ["false"],
+    "var-name-mixedcase": ["false"]
   },
   "plugins": ["prettier"]
 }

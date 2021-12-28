@@ -16,7 +16,7 @@ struct StrategyParams {
     uint256 totalLoss; // Total losses that Strategy has realized for Vault
 }
 
-interface IVault is IERC20 {
+interface IVault {
     function token() external view returns (IERC20Metadata);
 
     function apiVersion() external view returns (string memory _apiVersion);
