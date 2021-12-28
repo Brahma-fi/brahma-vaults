@@ -11,7 +11,7 @@ import "../../lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol"
 import "../../lib/openzeppelin-contracts/contracts/utils/math/SafeMath.sol";
 import "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
 
-contract Vault is IVault, ERC20, ReentrancyGuard {
+contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20Metadata;
 
@@ -67,10 +67,7 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     }
 
     function acceptGovernance() external override {
-        require(
-            msg.sender == pendingGovernance,
-            "access :: only pendingGovernance"
-        );
+        _onlyPendingGovernance();
         governance = msg.sender;
     }
 
@@ -83,18 +80,12 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     }
 
     function setRewards(address _rewards) external override onlyGovernance {
-        require(
-            _rewards != address(0x0) && rewards != address(this),
-            "Invalid rewards address"
-        );
+        require(rewards != address(this), "Invalid rewards");
         rewards = _rewards;
     }
 
     function setGuardian(address _guardian) external override {
-        require(
-            msg.sender == guardian || msg.sender == governance,
-            "access restricted"
-        );
+        _onlyGovernanceGuardian();
         guardian = _guardian;
     }
 
@@ -126,12 +117,9 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
 
     function setEmergencyShutdown(bool _active) external override {
         if (_active) {
-            require(
-                msg.sender == guardian || msg.sender == governance,
-                "access restricted"
-            );
+            _onlyGovernanceGuardian();
         } else {
-            require(msg.sender == governance, "access: onlyGovernance");
+            _onlyGovernance();
         }
 
         emergencyShutdown = _active;
@@ -190,7 +178,7 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         returns (uint256 sharesOut)
     {
         _depositHealthCheck();
-        require(_amount > 0, "amount cannot be zero");
+        _nonZero(_amount, "zero amount");
         require(_totalAssets() + _amount <= depositLimit, "excess deposit");
 
         sharesOut = _issueSharesForAmount(recepient, _amount);
@@ -209,7 +197,7 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
             token.balanceOf(msg.sender)
         );
 
-        require(_amount > 0, "amount cannot be zero");
+        _nonZero(_amount, "zero amount");
 
         sharesOut = _issueSharesForAmount(recepient, _amount);
         token.safeTransferFrom(msg.sender, address(this), _amount);
@@ -262,7 +250,7 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
             shares <= IERC20(address(this)).balanceOf(msg.sender),
             "insufficient balance"
         );
-        require(shares > 0, "cannot withdraw 0 shares");
+        _nonZero(shares, "zero shares");
 
         uint256 value = _shareValue(shares);
 
@@ -441,7 +429,7 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         uint256 _performanceFee
     ) external override validStrategyUpdation(strategy) {
         require(performanceFee <= MAX_BPS / 2, "performance fee too high");
-        require(performanceFee != 0, "performance fee too low");
+        _nonZero(performanceFee, "low performanceFee");
         strategies[strategy].performanceFee = _performanceFee;
     }
 
@@ -467,13 +455,10 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     {
         require(newVersion != address(0x0), "invalid new version address");
         require(
-            strategies[oldVersion].activation > 0,
-            "old version not activated"
-        );
-        require(
             strategies[newVersion].activation == 0,
             "new version already activated"
         );
+        _nonZero(strategies[oldVersion].activation, "unactivated version");
 
         StrategyParams memory strategy = strategies[oldVersion];
         _revokeStrategy(oldVersion);
@@ -702,7 +687,7 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         }
 
         uint256 duration = block.timestamp - strategies[strategy].lastReport;
-        require(duration != 0, "duration cannot be zero");
+        _nonZero(duration, "zero duration");
 
         if (gain == 0) {
             return 0;
@@ -732,7 +717,7 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         uint256 loss,
         uint256 _debtPayment
     ) external override returns (uint256 debt) {
-        require(strategies[msg.sender].activation > 0, "strategy not active");
+        _nonZero(strategies[msg.sender].activation, "inactive strategy");
         require(
             token.balanceOf(msg.sender) >= gain + _debtPayment,
             "insufficient funds"
@@ -787,12 +772,12 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         override
         onlyGovernance
     {
-        require(_token != address(token), "cannot be want token");
+        _wantToken(_token);
         IERC20Metadata(_token).safeTransfer(governance, amount);
     }
 
     function sweep(address _token) external override onlyGovernance {
-        require(_token != address(token), "cannot be want token");
+        _wantToken(_token);
         IERC20Metadata(_token).safeTransfer(
             governance,
             IERC20Metadata(_token).balanceOf(address(this))
@@ -820,27 +805,62 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         activation = block.timestamp;
     }
 
-    modifier onlyGovernance() {
-        require(msg.sender == governance, "access :: onlyGovernance");
-        _;
+    function _onlyGovernance() internal view {
+        require(msg.sender == governance, "access :: Governance");
     }
 
-    modifier onlyGuardian() {
-        require(msg.sender == guardian, "access :: onlyGuardian");
-        _;
+    function _onlyGuardian() internal view {
+        require(msg.sender == guardian, "access :: Guardian");
     }
 
-    modifier onlyManagement() {
-        require(msg.sender == management, "access :: onlyManagement");
-        _;
+    function _onlyManagement() internal view {
+        require(msg.sender == management, "access :: Management");
     }
 
-    modifier validStrategyUpdation(address strategy) {
+    function _onlyPendingGovernance() internal view {
+        require(msg.sender == pendingGovernance, "access :: pendingGovernance");
+    }
+
+    function _onlyGovernanceGuardian() internal view {
+        require(
+            msg.sender == guardian || msg.sender == governance,
+            "access restricted"
+        );
+    }
+
+    function _nonZero(uint256 value, string memory message) internal pure {
+        require(value > 0, message);
+    }
+
+    function _wantToken(address _token) internal view {
+        require(_token != address(token), "cannot be want token");
+    }
+
+    function _validStrategyUpdation(address strategy) internal view {
         require(
             msg.sender == governance || msg.sender == management,
             "access restricted"
         );
         require(strategies[strategy].activation > 0, "strategy not activated");
+    }
+
+    modifier onlyGovernance() {
+        _onlyGovernance();
+        _;
+    }
+
+    modifier onlyGuardian() {
+        _onlyGuardian();
+        _;
+    }
+
+    modifier onlyManagement() {
+        _onlyManagement();
+        _;
+    }
+
+    modifier validStrategyUpdation(address strategy) {
+        _validStrategyUpdation(strategy);
         _;
     }
 }
