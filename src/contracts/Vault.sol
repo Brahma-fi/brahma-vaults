@@ -5,14 +5,13 @@ pragma abicoder v2;
 import "./interfaces/IVault.sol";
 import "./interfaces/IStrategy.sol";
 import "./utils/ERC20.sol";
+import "./utils/Math.sol";
 
-import "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 import "../../lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
-import "../../lib/openzeppelin-contracts/contracts/utils/math/SafeMath.sol";
-import "../../lib/openzeppelin-contracts/contracts/utils/math/Math.sol";
+import "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import "../../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
-    using SafeMath for uint256;
     using SafeERC20 for IERC20Metadata;
 
     string public constant API_VERSION = "1.0.0";
@@ -154,7 +153,7 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         returns (uint256 shares)
     {
         if (totalSupply > 0) {
-            shares = amount.mul(totalSupply.div(_totalAssets()));
+            shares = amount * (totalSupply / _totalAssets());
         } else {
             shares = amount;
         }
@@ -207,7 +206,7 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
             return shares;
         }
 
-        return shares.mul(_totalAssets().div(totalSupply));
+        return shares * (_totalAssets() / totalSupply);
     }
 
     function _sharesForAmount(uint256 amount) internal view returns (uint256) {
@@ -217,7 +216,7 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
             return 0;
         }
 
-        return amount.mul(totalSupply.div(freeFunds));
+        return amount * (totalSupply / freeFunds);
     }
 
     function maxAvailableShares()
@@ -269,7 +268,7 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
                     break;
                 }
 
-                uint256 amountNeeded = value.sub(curVaultBalance);
+                uint256 amountNeeded = value - curVaultBalance;
                 amountNeeded = Math.min(
                     amountNeeded,
                     strategies[strategy].totalDebt
@@ -279,9 +278,8 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
                 }
 
                 uint256 loss = IStrategy(strategy).withdraw(amountNeeded);
-                uint256 withdrawn = token.balanceOf(address(this)).sub(
-                    curVaultBalance
-                );
+                uint256 withdrawn = token.balanceOf(address(this)) -
+                    curVaultBalance;
                 if (loss > 0) {
                     value -= loss;
                     totalLoss += loss;
@@ -294,11 +292,11 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
             uint256 vaultBalance = token.balanceOf(address(this));
             if (value > vaultBalance) {
                 value = vaultBalance;
-                shares = _sharesForAmount(value.add(totalLoss));
+                shares = _sharesForAmount(value + totalLoss);
             }
 
             require(
-                totalLoss <= maxLoss.mul(value.add(totalLoss).div(MAX_BPS)),
+                totalLoss <= maxLoss * ((value + totalLoss) / MAX_BPS),
                 "loss protection"
             );
         }
@@ -396,9 +394,9 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         validStrategyUpdation(strategy)
     {
         require(debtRatio + _debtRatio <= MAX_BPS, "debtRatio exceeded");
-        debtRatio = debtRatio.sub(strategies[strategy].debtRatio);
+        debtRatio = debtRatio - strategies[strategy].debtRatio;
         strategies[strategy].debtRatio = _debtRatio;
-        debtRatio = debtRatio.add(_debtRatio);
+        debtRatio = debtRatio + _debtRatio;
     }
 
     function updateStrategyMinDebtPerHarvest(
@@ -525,9 +523,8 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
             return strategies[strategy].totalDebt;
         }
 
-        uint256 strategyDebtLimit = strategies[strategy].debtRatio.mul(
-            _totalAssets().div(MAX_BPS)
-        );
+        uint256 strategyDebtLimit = strategies[strategy].debtRatio *
+            (_totalAssets() / MAX_BPS);
         uint256 strategyTotalDebt = strategies[strategy].totalDebt;
 
         if (emergencyShutdown) {
@@ -535,7 +532,7 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         } else if (strategyTotalDebt == strategyDebtLimit) {
             return 0;
         } else {
-            return strategyTotalDebt.sub(strategyDebtLimit);
+            return strategyTotalDebt - strategyDebtLimit;
         }
     }
 
@@ -558,10 +555,9 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         }
 
         uint256 vaultTotalAssets = _totalAssets();
-        uint256 vaultDebtLimit = debtRatio.mul(vaultTotalAssets.div(MAX_BPS));
-        uint256 strategyDebtLimit = strategies[strategy].debtRatio.mul(
-            vaultTotalAssets.div(MAX_BPS)
-        );
+        uint256 vaultDebtLimit = debtRatio * (vaultTotalAssets / MAX_BPS);
+        uint256 strategyDebtLimit = strategies[strategy].debtRatio *
+            (vaultTotalAssets / MAX_BPS);
         uint256 strategyTotalDebt = strategies[strategy].totalDebt;
         uint256 strategyMinDebtPerHarvest = strategies[strategy]
             .minDebtPerHarvest;
@@ -576,7 +572,7 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         }
 
         uint256 available = strategyDebtLimit - strategyTotalDebt;
-        available = Math.min(available, vaultDebtLimit.sub(totalDebt));
+        available = Math.min(available, vaultDebtLimit - totalDebt);
         available = Math.min(available, token.balanceOf(address(this)));
 
         if (available < strategyMinDebtPerHarvest) {
@@ -597,7 +593,7 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
 
     function availableDepositLimit() external view override returns (uint256) {
         if (depositLimit > _totalAssets()) {
-            return depositLimit.sub(_totalAssets());
+            return depositLimit - _totalAssets();
         } else {
             return 0;
         }
@@ -605,10 +601,9 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
 
     function _expectedReturn(address strategy) internal view returns (uint256) {
         uint256 strategyLastReport = strategies[strategy].lastReport;
-        uint256 timeSinceLastHarvest = block.timestamp.sub(strategyLastReport);
-        uint256 totalHarvestTime = strategyLastReport.sub(
-            strategies[strategy].activation
-        );
+        uint256 timeSinceLastHarvest = block.timestamp - strategyLastReport;
+        uint256 totalHarvestTime = strategyLastReport -
+            strategies[strategy].activation;
 
         if (
             timeSinceLastHarvest > 0 &&
@@ -616,9 +611,8 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
             IStrategy(strategy).isActive()
         ) {
             return
-                strategies[strategy].totalGain.mul(
-                    timeSinceLastHarvest.div(totalHarvestTime)
-                );
+                strategies[strategy].totalGain *
+                (timeSinceLastHarvest / totalHarvestTime);
         } else {
             return 0;
         }
@@ -638,17 +632,15 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         uint256 gain,
         address strategy
     ) internal returns (uint256 totalFee) {
-        uint256 _managementFee = (
-            strategies[strategy]
-                .totalDebt
-                .sub(IStrategy(strategy).delegatedAssets())
-                .mul(duration)
-                .mul(managementFee)
-        ).div(MAX_BPS).div(SECS_PER_YEAR);
-        uint256 _strategistFee = gain.mul(
-            strategies[strategy].performanceFee.div(MAX_BPS)
-        );
-        uint256 _performanceFee = gain.mul(performanceFee.div(MAX_BPS));
+        uint256 _managementFee = ((strategies[strategy].totalDebt -
+            IStrategy(strategy).delegatedAssets()) *
+            duration *
+            managementFee) /
+            MAX_BPS /
+            SECS_PER_YEAR;
+        uint256 _strategistFee = gain *
+            (strategies[strategy].performanceFee / MAX_BPS);
+        uint256 _performanceFee = gain * (performanceFee / MAX_BPS);
 
         totalFee = _managementFee + _strategistFee + _performanceFee;
 
@@ -659,9 +651,7 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
             uint256 reward = _issueSharesForAmount(address(this), totalFee);
 
             if (_strategistFee > 0) {
-                uint256 strategistReward = _strategistFee.mul(
-                    reward.div(totalFee)
-                );
+                uint256 strategistReward = _strategistFee * (reward / totalFee);
                 IERC20Metadata(address(this)).safeTransfer(
                     strategy,
                     strategistReward
@@ -705,10 +695,8 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         require(strategies[strategy].totalDebt >= loss, "lose exceeded debt");
 
         strategies[strategy].totalLoss += loss;
-        strategies[strategy].totalDebt += strategies[strategy].totalDebt.sub(
-            loss
-        );
-        totalDebt = totalDebt.sub(loss);
+        strategies[strategy].totalDebt += strategies[strategy].totalDebt - loss;
+        totalDebt = totalDebt - loss;
     }
 
     function report(
@@ -745,14 +733,14 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
             totalDebt += credit;
         }
 
-        uint256 totalAvail = gain.add(debtPayment);
+        uint256 totalAvail = gain + debtPayment;
         if (totalAvail < credit) {
-            token.safeTransfer(msg.sender, credit.sub(totalAvail));
+            token.safeTransfer(msg.sender, credit - totalAvail);
         } else if (totalAvail > credit) {
             token.safeTransferFrom(
                 msg.sender,
                 address(this),
-                totalAvail.sub(credit)
+                totalAvail - credit
             );
         }
 
