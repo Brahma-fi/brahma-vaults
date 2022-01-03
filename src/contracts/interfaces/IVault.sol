@@ -90,16 +90,10 @@ interface IVault {
         external
         returns (uint256 sharesOut);
 
-    function deposit(address recepient) external returns (uint256 sharesOut);
-
     function maxAvailableShares()
         external
         view
         returns (uint256 _maxAvailableShares);
-
-    function withdraw(address recepient, uint256 maxLoss)
-        external
-        returns (uint256);
 
     function withdraw(
         uint256 maxShares,
@@ -158,6 +152,4 @@ interface IVault {
     ) external returns (uint256 debt);
 
     function sweep(address token, uint256 amount) external;
-
-    function sweep(address token) external;
 }

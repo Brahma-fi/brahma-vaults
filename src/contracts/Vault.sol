@@ -6,6 +6,7 @@ import "./interfaces/IVault.sol";
 import "./interfaces/IStrategy.sol";
 import "./utils/ERC20.sol";
 import "./utils/Math.sol";
+import "./libraries/VaultTransaction.sol";
 
 import "../../lib/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
@@ -183,24 +184,6 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         token.safeTransferFrom(msg.sender, address(this), _amount);
     }
 
-    function deposit(address recepient)
-        external
-        override
-        nonReentrant
-        returns (uint256 sharesOut)
-    {
-        _depositHealthCheck();
-        uint256 _amount = Math.min(
-            depositLimit - _totalAssets(),
-            token.balanceOf(msg.sender)
-        );
-
-        _nonZero(_amount, "zero amount");
-
-        sharesOut = _issueSharesForAmount(recepient, _amount);
-        token.safeTransferFrom(msg.sender, address(this), _amount);
-    }
-
     function _shareValue(uint256 shares) internal view returns (uint256) {
         if (totalSupply == 0) {
             return shares;
@@ -305,15 +288,6 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         token.safeTransfer(recepient, value);
 
         return value;
-    }
-
-    function withdraw(address recepient, uint256 maxLoss)
-        external
-        override
-        nonReentrant
-        returns (uint256)
-    {
-        return _withdraw(token.balanceOf(msg.sender), recepient, maxLoss);
     }
 
     function withdraw(
@@ -761,14 +735,6 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
     {
         _wantToken(_token);
         IERC20Metadata(_token).safeTransfer(governance, amount);
-    }
-
-    function sweep(address _token) external override onlyGovernance {
-        _wantToken(_token);
-        IERC20Metadata(_token).safeTransfer(
-            governance,
-            IERC20Metadata(_token).balanceOf(address(this))
-        );
     }
 
     function _initialize(
