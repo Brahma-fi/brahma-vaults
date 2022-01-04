@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: Unlicense
-pragma solidity ^0.8.0;
+pragma solidity >=0.8.4;
 pragma abicoder v2;
 
 import "./interfaces/IVault.sol";
@@ -43,6 +43,7 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
     uint256 public override performanceFee;
 
     constructor(
+        uint256 _depositLimit,
         address _token,
         address _governance,
         address _rewards,
@@ -52,7 +53,14 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         string memory _symbol,
         uint8 _decimal
     ) ERC20(_name, _symbol, _decimal) {
-        _initialize(_token, _governance, _rewards, _guardian, _management);
+        _initialize(
+            _depositLimit,
+            _token,
+            _governance,
+            _rewards,
+            _guardian,
+            _management
+        );
     }
 
     function apiVersion() external pure override returns (string memory) {
@@ -738,12 +746,14 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
     }
 
     function _initialize(
+        uint256 _depositLimit,
         address _token,
         address _governance,
         address _rewards,
         address _guardian,
         address _management
     ) internal {
+        depositLimit = _depositLimit;
         token = IERC20Metadata(_token);
 
         governance = _governance;
