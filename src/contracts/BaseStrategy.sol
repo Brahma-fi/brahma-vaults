@@ -511,10 +511,10 @@ abstract contract BaseStrategy {
      *
      *  This may only be called by governance, the strategist, or the keeper.
      */
-    function tend() external {
+    function tend(bytes memory params) external {
         _onlyKeepers();
         // Don't take profits with this call, but adjust for better gains
-        adjustPosition(vault.debtOutstanding());
+        adjustPosition(vault.debtOutstanding(address(this)), params);
     }
 
     /**
@@ -572,7 +572,7 @@ abstract contract BaseStrategy {
         //       changes to the value from triggering a harvest directly through user
         //       behavior. This should ensure reasonable resistance to manipulation
         //       from user-initiated withdrawals as the outstanding debt fluctuates.
-        uint256 outstanding = vault.debtOutstanding();
+        uint256 outstanding = vault.debtOutstanding(address(this));
         if (outstanding > debtThreshold) return true;
 
         // Check for profits and losses
@@ -585,7 +585,7 @@ abstract contract BaseStrategy {
 
         // Otherwise, only trigger if it "makes sense" economically (gas cost
         // is <N% of value moved)
-        uint256 credit = vault.creditAvailable();
+        uint256 credit = vault.creditAvailable(address(this));
         return (profitFactor.mul(callCost) < credit.add(profit));
     }
 
@@ -610,7 +610,7 @@ abstract contract BaseStrategy {
         _onlyKeepers();
         uint256 profit = 0;
         uint256 loss = 0;
-        uint256 debtOutstanding = vault.debtOutstanding();
+        uint256 debtOutstanding = vault.debtOutstanding(address(this));
         uint256 debtPayment = 0;
         if (emergencyExit) {
             // Free up as much capital as possible
@@ -701,7 +701,7 @@ abstract contract BaseStrategy {
     function setEmergencyExit() external {
         _onlyEmergencyAuthorized();
         emergencyExit = true;
-        vault.revokeStrategy();
+        vault.revokeStrategy(address(this));
 
         emit EmergencyExitEnabled();
     }
@@ -764,7 +764,7 @@ abstract contract BaseStrategyInitializable is BaseStrategy {
     bool public isOriginal = true;
     event Cloned(address indexed clone);
 
-    constructor(address _vault) public BaseStrategy(_vault) {}
+    constructor(address _vault) BaseStrategy(_vault) {}
 
     function initialize(
         address _vault,

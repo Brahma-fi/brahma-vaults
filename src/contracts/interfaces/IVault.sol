@@ -32,17 +32,7 @@ interface IVault {
     function strategies(address _strategyAddress)
         external
         view
-        returns (
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256,
-            uint256
-        );
+        returns (StrategyParams memory);
 
     function strategiesCount() external view returns (uint256);
 
