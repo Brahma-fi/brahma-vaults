@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0
-pragma solidity ^0.7.6;
+pragma solidity ^0.8.0;
 pragma experimental ABIEncoderV2;
 
 import "./interfaces/IVault.sol";
@@ -393,7 +393,7 @@ abstract contract BaseStrategy {
      */
     function isActive() public view returns (bool) {
         return
-            vault.strategies(address(this)).debtRatio > 0 ||
+            vault.getStrategy(address(this)).debtRatio > 0 ||
             estimatedTotalAssets() > 0;
     }
 
@@ -554,7 +554,7 @@ abstract contract BaseStrategy {
         returns (bool)
     {
         uint256 callCost = ethToWant(callCostInWei);
-        StrategyParams memory params = vault.strategies(address(this));
+        StrategyParams memory params = vault.getStrategy(address(this));
 
         // Should not trigger if Strategy is not activated
         if (params.activation == 0) return false;

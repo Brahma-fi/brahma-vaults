@@ -87,6 +87,8 @@ contract ContractTest is DSTest {
         );
     }
 
+    /* STRATEGY */
+
     /* HELPERS */
 
     function swapAndGetBalances(uint256 _ethToSwap) internal {
