@@ -29,7 +29,7 @@ interface IVault {
 
     function pendingGovernance() external view returns (address);
 
-    function strategies(address _strategyAddress)
+    function getStrategy(address _strategyAddress)
         external
         view
         returns (StrategyParams memory);

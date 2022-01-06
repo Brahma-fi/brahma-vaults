@@ -26,7 +26,7 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
     address public override management;
     address public override guardian;
 
-    mapping(address => StrategyParams) public override strategies;
+    mapping(address => StrategyParams) private strategies;
     uint256 public override strategiesCount;
     address[] public withdrawalQueue;
 
@@ -65,6 +65,15 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
 
     function apiVersion() external pure override returns (string memory) {
         return API_VERSION;
+    }
+
+    function getStrategy(address _strategyAddress)
+        external
+        view
+        override
+        returns (StrategyParams memory)
+    {
+        return strategies[_strategyAddress];
     }
 
     function setGovernance(address _governance)
