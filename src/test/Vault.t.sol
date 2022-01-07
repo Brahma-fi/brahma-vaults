@@ -92,20 +92,143 @@ contract ContractTest is DSTest {
     /* STRATEGY */
 
     function testAddStrategy() public {
-        Strategy strategy = new Strategy(address(vault), 1000, 6400, 100, 0);
-        vault.addStrategy(address(strategy), 50, 500, 1000, 2000);
+        Strategy strategy = _addStrategy(50, 500, 1000, 2000);
 
-        StrategyParams memory strategyParams = vault.getStrategy(
-            address(strategy)
-        );
         address addedStrategy = vault.withdrawalQueue(0);
         emit log_named_address("Added strategy", addedStrategy);
 
         assertEq(addedStrategy, address(strategy));
-        assertEq(strategyParams.performanceFee, 2000);
-        assertEq(strategyParams.debtRatio, 50);
-        assertEq(strategyParams.minDebtPerHarvest, 500);
-        assertEq(strategyParams.maxDebtPerHarvest, 1000);
+        _assertStrategyParams(
+            vault.getStrategy(address(strategy)),
+            50,
+            500,
+            1000,
+            2000
+        );
+    }
+
+    function testUpdateStrategy() public {
+        Strategy strategy = _addStrategy(50, 500, 1000, 2000);
+
+        vault.updateStrategyDebtRatio(address(strategy), 65);
+        vault.updateStrategyMinDebtPerHarvest(address(strategy), 750);
+        vault.updateStrategyMaxDebtPerHarvest(address(strategy), 1500);
+        vault.updateStrategyPerformanceFee(address(strategy), 1500);
+
+        _assertStrategyParams(
+            vault.getStrategy(address(strategy)),
+            65,
+            750,
+            1500,
+            1500
+        );
+    }
+
+    function testRevokeStrategy() public {
+        _addStrategy(50, 500, 1000, 2000);
+        Strategy strategy = _addStrategy(50, 500, 1000, 2000);
+
+        uint256 initialDebtRatio = vault.debtRatio();
+        vault.revokeStrategy(address(strategy));
+        uint256 finalDebtRatio = vault.debtRatio();
+
+        StrategyParams memory removedStrategy = vault.getStrategy(
+            address(strategy)
+        );
+
+        emit log_named_uint("Initial debt ratio", initialDebtRatio);
+        emit log_named_uint("Final debt ratio", finalDebtRatio);
+
+        assertEq(removedStrategy.debtRatio, 0);
+        assertEq(initialDebtRatio, 100);
+        assertEq(finalDebtRatio, initialDebtRatio - 50);
+    }
+
+    function testMigrateStrategy() public {
+        Strategy oldStrategy = _addStrategy(50, 500, 1000, 2000);
+        Strategy newStrategy = new Strategy(address(vault), 1000, 6400, 100, 0);
+
+        uint256 oldDebtRatio = vault.debtRatio();
+
+        _assertStrategyParams(
+            vault.getStrategy(address(newStrategy)),
+            0,
+            0,
+            0,
+            0
+        );
+
+        vault.migrateStrategy(address(oldStrategy), address(newStrategy));
+        _assertStrategyParams(
+            vault.getStrategy(address(newStrategy)),
+            50,
+            500,
+            1000,
+            2000
+        );
+
+        emit log_named_address("Old strategy", address(oldStrategy));
+        emit log_named_address("New strategy", address(newStrategy));
+
+        assertEq(oldDebtRatio, vault.debtRatio());
+        assertEq(address(newStrategy), vault.withdrawalQueue(0));
+    }
+
+    function testAddStrategyToQueue() public {
+        Strategy strategy = _removeStrategyFromQueueAndAssert();
+
+        vault.addStrategyToQueue(address(strategy));
+        emit log_named_address("Added strategy", address(strategy));
+
+        assertEq(vault.withdrawalQueue(0), address(strategy));
+    }
+
+    function testRemoveStrategyFromQueue() public {
+        _removeStrategyFromQueueAndAssert();
+    }
+
+    function _addStrategy(
+        uint256 debtRatio,
+        uint256 minDebtPerHarvest,
+        uint256 maxDebtPerHarvest,
+        uint256 performanceFee
+    ) internal returns (Strategy strategy) {
+        strategy = new Strategy(address(vault), 1000, 6400, 100, 0);
+        vault.addStrategy(
+            address(strategy),
+            debtRatio,
+            minDebtPerHarvest,
+            maxDebtPerHarvest,
+            performanceFee
+        );
+    }
+
+    function _assertStrategyParams(
+        StrategyParams memory strategyParams,
+        uint256 debtRatio,
+        uint256 minDebtPerHarvest,
+        uint256 maxDebtPerHarvest,
+        uint256 performanceFee
+    ) internal {
+        assertEq(strategyParams.performanceFee, performanceFee);
+        assertEq(strategyParams.debtRatio, debtRatio);
+        assertEq(strategyParams.minDebtPerHarvest, minDebtPerHarvest);
+        assertEq(strategyParams.maxDebtPerHarvest, maxDebtPerHarvest);
+    }
+
+    function _removeStrategyFromQueueAndAssert()
+        internal
+        returns (Strategy strategy)
+    {
+        strategy = _addStrategy(50, 500, 1000, 2000);
+        address addedStrategy = vault.withdrawalQueue(0);
+
+        vault.removeStrategyFromQueue(address(strategy));
+
+        emit log_named_address("Removed strategy", address(strategy));
+
+        assertEq(addedStrategy, address(strategy));
+        assertEq(vault.withdrawalQueue(0), address(0x0));
     }
 
     /* HELPERS */
