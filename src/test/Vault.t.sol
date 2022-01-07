@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 
-import "../contracts/Vault.sol";
+import {BrahmaVault} from "../contracts/Vault.sol";
+import {StrategyParams} from "../contracts/interfaces/IVault.sol";
+
 import "./utils/IWETH9.sol";
 import "./utils/ISwapRouter.sol";
+import "./utils/perp-interface/contracts/Strategy.sol";
 
 import "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 import "../../lib/ds-test/src/test.sol";
@@ -88,6 +91,14 @@ contract ContractTest is DSTest {
     }
 
     /* STRATEGY */
+
+    function testAddStrategy() internal {
+        Strategy strategy = new Strategy(address(vault), 1000, 6400, 100, 0);
+        vault.addStrategy(address(strategy), 50, 500, 1000, 2000);
+
+        StrategyParams strategyParams = vault.getStrategy(address(strategy));
+        assertEq(strategyParams.performanceFee, 2000);
+    }
 
     /* HELPERS */
 
