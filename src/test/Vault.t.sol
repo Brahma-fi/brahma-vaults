@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: Unlicense
 pragma solidity ^0.8.0;
 
-import {BrahmaVault} from "../contracts/Vault.sol";
+import {BrahmaVault, IERC20Metadata} from "../contracts/Vault.sol";
 import {StrategyParams} from "../contracts/interfaces/IVault.sol";
 
 import "./utils/IWETH9.sol";
 import "./utils/ISwapRouter.sol";
-import "./utils/perp-interface/contracts/Strategy.sol";
 
-import "../../lib/openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {Strategy} from "../../lib/perp-interface/contracts/Strategy.sol";
 import "../../lib/ds-test/src/test.sol";
 
 contract ContractTest is DSTest {
@@ -92,12 +91,21 @@ contract ContractTest is DSTest {
 
     /* STRATEGY */
 
-    function testAddStrategy() internal {
+    function testAddStrategy() public {
         Strategy strategy = new Strategy(address(vault), 1000, 6400, 100, 0);
         vault.addStrategy(address(strategy), 50, 500, 1000, 2000);
 
-        StrategyParams strategyParams = vault.getStrategy(address(strategy));
+        StrategyParams memory strategyParams = vault.getStrategy(
+            address(strategy)
+        );
+        address addedStrategy = vault.withdrawalQueue(0);
+        emit log_named_address("Added strategy", addedStrategy);
+
+        assertEq(addedStrategy, address(strategy));
         assertEq(strategyParams.performanceFee, 2000);
+        assertEq(strategyParams.debtRatio, 50);
+        assertEq(strategyParams.minDebtPerHarvest, 500);
+        assertEq(strategyParams.maxDebtPerHarvest, 1000);
     }
 
     /* HELPERS */

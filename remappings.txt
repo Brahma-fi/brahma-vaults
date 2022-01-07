@@ -1,0 +1,3 @@
+@uniswap/v3-core/contracts=lib/perp-interface/node_modules/@uniswap/v3-core/contracts
+@openzeppelin/contracts-upgradeable-v2=lib/perp-interface/node_modules/@openzeppelin/contracts-upgradeable-v2
+hardhat=lib/perp-interface/node_modules/hardhat
