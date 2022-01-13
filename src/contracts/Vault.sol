@@ -690,12 +690,14 @@ contract BrahmaVault is IVault, ERC20, ReentrancyGuard {
         totalDebt = totalDebt - loss;
     }
 
+    // add comments sire
     function report(
         uint256 gain,
         uint256 loss,
         uint256 _debtPayment
     ) external override returns (uint256 debt) {
         _nonZero(strategies[msg.sender].activation, "inactive strategy");
+        // is this condition always true ?
         require(
             token.balanceOf(msg.sender) >= gain + _debtPayment,
             "insufficient funds"
